@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Music Generator - Qwen 0.6B</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #aaa;
+            margin-bottom: 30px;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .panel h2 {
+            margin-bottom: 15px;
+            color: #00d9ff;
+            font-size: 1.3em;
+        }
+
+        textarea {
+            width: 100%;
+            height: 150px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            color: #fff;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: vertical;
+            margin-bottom: 15px;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #00d9ff;
+        }
+
+        button {
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            color: #1a1a2e;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 217, 255, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .status.loading {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+        }
+
+        .status.success {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+        }
+
+        .status.error {
+            background: rgba(255, 82, 82, 0.2);
+            color: #ff5252;
+        }
+
+        .json-output {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .control-group {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #00d9ff;
+            font-size: 14px;
+        }
+
+        .control-group input,
+        .control-group select {
+            width: 100%;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .control-group input:focus,
+        .control-group select:focus {
+            outline: none;
+            border-color: #00d9ff;
+        }
+
+        .music-player {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .note-display {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 15px;
+            min-height: 50px;
+        }
+
+        .note {
+            background: linear-gradient(135deg, #00d9ff, #00ff88);
+            color: #1a1a2e;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            animation: popIn 0.3s ease;
+        }
+
+        @keyframes popIn {
+            0% {
+                transform: scale(0);
+                opacity: 0;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .server-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .server-status.connected {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+            border: 1px solid #00ff88;
+        }
+
+        .server-status.disconnected {
+            background: rgba(255, 82, 82, 0.2);
+            color: #ff5252;
+            border: 1px solid #ff5252;
+        }
+    </style>
+</head>
+<body>
+    <div class="server-status disconnected" id="serverStatus">
+        ● Server Disconnected
+    </div>
+
+    <div class="container">
+        <h1>🎵 AI Music Generator</h1>
+        <p class="subtitle">Powered by Qwen 0.6B Local GPU</p>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="genre">Music Genre</label>
+                <select id="genre">
+                    <option value="ambient">Ambient</option>
+                    <option value="electronic">Electronic</option>
+                    <option value="classical">Classical</option>
+                    <option value="jazz">Jazz</option>
+                    <option value="pop">Pop</option>
+                    <option value="rock">Rock</option>
+                    <option value="cinematic">Cinematic</option>
+                    <option value="lofi">Lo-Fi</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="tempo">Tempo (BPM)</label>
+                <input type="number" id="tempo" min="60" max="200" value="120">
+            </div>
+
+            <div class="control-group">
+                <label for="duration">Duration (seconds)</label>
+                <input type="number" id="duration" min="5" max="300" value="30">
+            </div>
+
+            <div class="control-group">
+                <label for="complexity">Complexity</label>
+                <select id="complexity">
+                    <option value="simple">Simple</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="complex">Complex</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="panel">
+                <h2>📝 Prompt</h2>
+                <textarea id="prompt" placeholder="Describe the music you want to generate...&#10;&#10;Example: A peaceful ambient track with soft piano melodies, gentle strings, and atmospheric pads. Perfect for meditation or relaxation."></textarea>
+                <button id="generateBtn" onclick="generateMusic()">🎹 Generate Music</button>
+                <div id="status" class="status" style="display: none;"></div>
+            </div>
+
+            <div class="panel">
+                <h2>📄 Generated JSON</h2>
+                <div class="json-output" id="jsonOutput">// Generated JSON will appear here...</div>
+                <button onclick="copyJSON()" style="margin-top: 10px;">📋 Copy JSON</button>
+            </div>
+        </div>
+
+        <div class="panel music-player">
+            <h2>🎼 Music Preview</h2>
+            <div class="note-display" id="noteDisplay"></div>
+            <canvas id="visualizer" width="800" height="200" style="width: 100%; height: 200px; margin-top: 15px; background: rgba(0,0,0,0.3); border-radius: 10px;"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5000';
+        let audioContext = null;
+        let isPlaying = false;
+
+        // Check server status
+        async function checkServerStatus() {
+            try {
+                const response = await fetch(`${API_URL}/health`);
+                if (response.ok) {
+                    updateServerStatus(true);
+                } else {
+                    updateServerStatus(false);
+                }
+            } catch (error) {
+                updateServerStatus(false);
+            }
+        }
+
+        function updateServerStatus(connected) {
+            const statusEl = document.getElementById('serverStatus');
+            if (connected) {
+                statusEl.textContent = '● Server Connected';
+                statusEl.className = 'server-status connected';
+            } else {
+                statusEl.textContent = '● Server Disconnected';
+                statusEl.className = 'server-status disconnected';
+            }
+        }
+
+        // Check server status every 5 seconds
+        setInterval(checkServerStatus, 5000);
+        checkServerStatus();
+
+        async function generateMusic() {
+            const prompt = document.getElementById('prompt').value;
+            const genre = document.getElementById('genre').value;
+            const tempo = document.getElementById('tempo').value;
+            const duration = document.getElementById('duration').value;
+            const complexity = document.getElementById('complexity').value;
+
+            if (!prompt.trim()) {
+                showStatus('Please enter a prompt', 'error');
+                return;
+            }
+
+            const generateBtn = document.getElementById('generateBtn');
+            generateBtn.disabled = true;
+            generateBtn.textContent = '⏳ Generating...';
+
+            showStatus('Generating music with Qwen 0.6B...', 'loading');
+
+            try {
+                const response = await fetch(`${API_URL}/generate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        genre: genre,
+                        tempo: parseInt(tempo),
+                        duration: parseInt(duration),
+                        complexity: complexity
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                // Display the generated JSON
+                const jsonString = JSON.stringify(data.music_json, null, 2);
+                document.getElementById('jsonOutput').textContent = jsonString;
+                
+                showStatus('Music generated successfully!', 'success');
+                
+                // Visualize the music
+                visualizeMusic(data.music_json);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showStatus('Error generating music. Make sure the server is running.', 'error');
+            } finally {
+                generateBtn.disabled = false;
+                generateBtn.textContent = '🎹 Generate Music';
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            statusEl.style.display = 'block';
+            
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, 5000);
+        }
+
+        function copyJSON() {
+            const jsonText = document.getElementById('jsonOutput').textContent;
+            navigator.clipboard.writeText(jsonText).then(() => {
+                showStatus('JSON copied to clipboard!', 'success');
+            });
+        }
+
+        function visualizeMusic(musicData) {
+            const noteDisplay = document.getElementById('noteDisplay');
+            noteDisplay.innerHTML = '';
+            
+            if (musicData.notes && musicData.notes.length > 0) {
+                musicData.notes.slice(0, 20).forEach((note, index) => {
+                    const noteEl = document.createElement('div');
+                    noteEl.className = 'note';
+                    noteEl.textContent = `${note.pitch}${note.octave}`;
+                    noteEl.style.animationDelay = `${index * 0.05}s`;
+                    noteDisplay.appendChild(noteEl);
+                });
+            }
+            
+            drawVisualizer(musicData);
+        }
+
+        function drawVisualizer(musicData) {
+            const canvas = document.getElementById('visualizer');
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            ctx.clearRect(0, 0, width, height);
+            
+            if (!musicData.notes || musicData.notes.length === 0) return;
+            
+            const barWidth = width / Math.min(musicData.notes.length, 50);
+            const maxAmplitude = Math.max(...musicData.notes.map(n => n.velocity || 50));
+            
+            musicData.notes.slice(0, 50).forEach((note, index) => {
+                const x = index * barWidth;
+                const barHeight = (note.velocity || 50) / maxAmplitude * (height - 20);
+                const hue = (index / Math.min(musicData.notes.length, 50)) * 360;
+                
+                ctx.fillStyle = `hsla(${hue}, 100%, 50%, 0.8)`;
+                ctx.fillRect(x, height - barHeight, barWidth - 2, barHeight);
+            });
+        }
+
+        // Initialize audio context on user interaction
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        // Add keyboard shortcut
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                generateMusic();
+            }
+        });
+    </script>
+</body>
+</html>
